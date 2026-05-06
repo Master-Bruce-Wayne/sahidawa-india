@@ -88,8 +88,9 @@ flowchart TD
 
 ### Frontend
 
-- **[Next.js 14](https://nextjs.org/)** — React framework with App Router + SSR
-- **[Tailwind CSS](https://tailwindcss.com/)** + **[shadcn/ui](https://ui.shadcn.com/)** — UI components
+- **[Next.js 15](https://nextjs.org/)** — React 19 framework with App Router + SSR
+- **[Tailwind CSS 4.0](https://tailwindcss.com/)** — High-performance utility-first CSS
+- **[shadcn/ui](https://ui.shadcn.com/)** — UI components
 - **[Workbox](https://developer.chrome.com/docs/workbox/)** — PWA offline caching
 - **[@zxing/browser](https://github.com/zxing-js/library)** — In-browser barcode/QR scanning
 - **[Leaflet.js](https://leafletjs.com/)** + **OpenStreetMap** — Maps (free, no API key)
@@ -97,7 +98,7 @@ flowchart TD
 
 ### Backend
 
-- **[Node.js](https://nodejs.org/)** + **[Express](https://expressjs.com/)** + **TypeScript** — API server
+- **[Node.js 22](https://nodejs.org/)** + **[Express 5.0](https://expressjs.com/)** + **TypeScript** — API server
 - **[Redis](https://redis.io/)** (Upstash free tier) — Drug lookup caching
 - **[FastAPI](https://fastapi.tiangolo.com/)** + **Python** — ML microservice
 
@@ -172,7 +173,7 @@ flowchart TD
 ### Prerequisites
 
 ```bash
-node >= 18.0.0
+node >= 20.0.0
 python >= 3.10
 docker >= 24.0 (optional, for full stack)
 ```
