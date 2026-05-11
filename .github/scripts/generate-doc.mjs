@@ -23,14 +23,14 @@
  *   REPO_SLUG        — e.g. "RatLoopz/sahidawa-india"
  */
 
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from "fs";
+import { writeFileSync, mkdirSync, existsSync, readFileSync, readdirSync, appendFileSync } from "fs";
 import { join, dirname } from "path";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
-  console.error("❌ GEMINI_API_KEY is not set. Add it as a GitHub Actions secret.");
+  console.error("❌ GEMINI_API_KEY is not set. Add it as a GitHub Actions secret named GEMINI_API_KEY.");
   process.exit(1);
 }
 
@@ -252,11 +252,9 @@ function updateIndex(docPath, adrPath) {
     current = readFileSync(indexPath, "utf8");
   }
 
-  // Append new row after the table header if index exists, else insert before it
   if (current.includes("| PR |")) {
     writeFileSync(indexPath, current.trimEnd() + "\n" + newEntry + "\n", "utf8");
   } else {
-    // Index is missing the table — regenerate header + new row
     const header = `# SahiDawa DevTrack — Knowledge Index
 
 This index is automatically maintained by the DevTrack system.
@@ -275,20 +273,12 @@ ${newEntry}
   console.log("✅ Index updated: docs/devtrack/README.md");
 }
 
-// ─── ADR Number Tracker ───────────────────────────────────────────────────────
-
 function getNextADRNumber() {
   const adrDir = join(process.cwd(), "docs/devtrack/adr");
-  if (!existsSync(adrDir)) return 1;
-  const { readdirSync } = await import("fs").catch(() => ({ readdirSync: () => [] }));
-  try {
-    const { readdirSync: rd } = require("fs");
-    const files = rd(adrDir).filter(f => f.endsWith(".md") && f !== "README.md");
-    const nums = files.map(f => parseInt(f.match(/^ADR-(\d+)/)?.[1] || "0", 10));
-    return Math.max(0, ...nums) + 1;
-  } catch {
-    return 1;
-  }
+  if (!existsSync(adrDir)) return "001";
+  const files = readdirSync(adrDir).filter(f => /^ADR-\d+/.test(f));
+  const nums = files.map(f => parseInt(f.match(/^ADR-(\d+)/)?.[1] || "0", 10));
+  return String(Math.max(0, ...nums) + 1).padStart(3, "0");
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -307,13 +297,7 @@ async function main() {
   let adrPath = null;
   if (ctx.verdict === "GENERATE+ADR") {
     console.log("⏳ Calling Gemini for ADR (high-impact PR)...");
-    const { readdirSync } = await import("fs");
-    const adrDir = join(process.cwd(), "docs/devtrack/adr");
-    mkdirSync(adrDir, { recursive: true });
-    const existingFiles = existsSync(adrDir) ? readdirSync(adrDir).filter(f => /^ADR-\d+/.test(f)) : [];
-    const nums = existingFiles.map(f => parseInt(f.match(/^ADR-(\d+)/)?.[1] || "0", 10));
-    const adrNumber = String(Math.max(0, ...nums) + 1).padStart(3, "0");
-    
+    const adrNumber = getNextADRNumber();
     const adrContent = await callGemini(buildADRPrompt());
     adrPath = `docs/devtrack/adr/ADR-${adrNumber}-${prSlug}.md`;
     writeDoc(adrContent, adrPath);
@@ -324,7 +308,6 @@ async function main() {
 
   // Write output paths for workflow to use in commit message
   if (process.env.GITHUB_OUTPUT) {
-    const { appendFileSync } = await import("fs");
     appendFileSync(process.env.GITHUB_OUTPUT, `doc_path=${prDocPath}\n`);
     if (adrPath) appendFileSync(process.env.GITHUB_OUTPUT, `adr_path=${adrPath}\n`);
   }
