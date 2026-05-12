@@ -94,7 +94,24 @@ async function callGemini(prompt) {
   }
 
   const data = await response.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const candidate = data.candidates?.[0];
+  
+  if (!candidate) {
+    console.error("Gemini API returned no candidates:", JSON.stringify(data, null, 2));
+    throw new Error("No candidates returned from Gemini API.");
+  }
+  
+  if (candidate.finishReason && candidate.finishReason !== "STOP") {
+    console.warn(`⚠️ Warning: Gemini generation stopped early! Reason: ${candidate.finishReason}`);
+  }
+
+  const text = candidate.content?.parts?.[0]?.text || "";
+  
+  if (!text.trim()) {
+    console.error("Gemini API returned empty text. Full response:", JSON.stringify(data, null, 2));
+  }
+
+  return text;
 }
 
 // ─── Prompt Templates ─────────────────────────────────────────────────────────
@@ -104,12 +121,14 @@ function buildPRDocPrompt() {
 
 CRITICAL RULES:
 - Write in first person as the SahiDawa engineering team ("we", "our system")
-- Be specific and technical — reference actual file names, function names, library names from the diff
+- Be highly specific and technical — reference actual file names, function names, library names from the diff
 - Focus on WHY decisions were made, not just WHAT was done
+- Even if the PR is very small (e.g., adding a single test script), write a comprehensive, easy-to-understand explanation of what it does and why it was added. Provide context!
 - If you cannot determine something clearly from the data, write exactly: "Not documented in this PR"
 - Do NOT add any preamble, intro, or closing remarks — output ONLY the markdown document
 - Do NOT use placeholder text like "Lorem ipsum" or "[insert here]"
-- The Implementation Notes section must be detailed enough for a contributor to re-implement the feature from scratch
+- The Implementation Notes section must be detailed enough for a contributor to re-implement the feature or understand the exact flow.
+- Ensure the document is complete. Do not stop mid-sentence.
 
 === PR DATA ===
 
