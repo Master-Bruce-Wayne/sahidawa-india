@@ -12,8 +12,19 @@ const port = process.env.PORT || 4000;
 
 // Middleware
 app.use(helmet());
-app.use(cors());
-app.use(express.json());
+
+// Security: restrict CORS to known origins instead of wildcard
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:4000',
+  'http://localhost:8000',
+];
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
+
+app.use(express.json({ limit: '1mb' }));
 app.use(morgan('dev'));
 
 // --- ADDED ROUTES ---

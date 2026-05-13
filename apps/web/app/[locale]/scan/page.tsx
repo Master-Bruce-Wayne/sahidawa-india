@@ -20,17 +20,25 @@ export default function ScanPage() {
     }
   }, [scanning]);
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setUploadedImage(reader.result as string);
-        setScanning(true);
-        setResult(null);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE) {
+      alert('File size exceeds 10MB limit. Please choose a smaller image.');
+      e.target.value = '';
+      return;
     }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setUploadedImage(reader.result as string);
+      setScanning(true);
+      setResult(null);
+    };
+    reader.readAsDataURL(file);
   };
 
   return (

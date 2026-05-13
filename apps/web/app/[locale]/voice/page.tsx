@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Mic, X, Globe, MessageSquare, Volume2, Sparkles, ChevronLeft, Send } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { PageHeader } from "../components/PageHeader";
@@ -9,18 +9,28 @@ export default function VoiceTriagePage() {
   const [isListening, setIsListening] = useState(false);
   const [step, setStep] = useState<"initial" | "listening" | "processing" | "result">("initial");
   const [language, setLanguage] = useState("Hindi");
+  const timerRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Cleanup all timers on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      timerRefs.current.forEach(clearTimeout);
+    };
+  }, []);
 
   const startListening = () => {
     setIsListening(true);
     setStep("listening");
     // Simulate processing after 3 seconds
-    setTimeout(() => {
+    const outerTimer = setTimeout(() => {
       setStep("processing");
       setIsListening(false);
-      setTimeout(() => {
+      const innerTimer = setTimeout(() => {
         setStep("result");
       }, 2000);
+      timerRefs.current.push(innerTimer);
     }, 3000);
+    timerRefs.current.push(outerTimer);
   };
 
   return (
