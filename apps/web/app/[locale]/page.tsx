@@ -109,9 +109,9 @@ export default function SahiDawaHome() {
               <button className="hover:text-emerald-600 transition-colors">
                 {tNav("how_it_works")}
               </button>
-              <button className="hover:text-emerald-600 transition-colors">
+              <Link href="/alerts" className="hover:text-emerald-600 transition-colors">
                 {tNav("alerts")}
-              </button>
+              </Link>
               <Link href="/map" className="hover:text-emerald-600 transition-colors">
                 {tNav("pharmacy_map")}
               </Link>
