@@ -55,6 +55,12 @@ export default function Footer() {
                             >
                                 About Us
                             </Link>
+                            <Link
+                            href="/contact"
+                           className="transition-all duration-200 hover:translate-x-1 hover:text-white"
+                               >
+                            Contact Us
+                           </Link>
                         </div>
                     </div>
 
