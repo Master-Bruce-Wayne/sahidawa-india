@@ -141,6 +141,7 @@ describe("useUpload", () => {
 
         await act(async () => {
             const uploadPromise = api.upload(file);
+            await new Promise((resolve) => setTimeout(resolve, 0));
             const xhr = MockXHR.instances[0]!;
             xhr.simulateProgress(50, 100);
             xhr.onload?.();
@@ -164,6 +165,7 @@ describe("useUpload", () => {
 
         await act(async () => {
             const uploadPromise = api.upload(file);
+            await new Promise((resolve) => setTimeout(resolve, 0));
             const xhr = MockXHR.instances[0]!;
             xhr.status = 500;
             xhr.responseText = JSON.stringify({ error: "Upload service unavailable" });
@@ -184,6 +186,7 @@ describe("useUpload", () => {
 
         await act(async () => {
             const uploadPromise = api.upload(file);
+            await new Promise((resolve) => setTimeout(resolve, 0));
             MockXHR.instances[0]?.onerror?.();
             await uploadPromise;
         });
@@ -220,6 +223,7 @@ describe("useUpload", () => {
 
         await act(async () => {
             const uploadPromise = api.upload(file);
+            await new Promise((resolve) => setTimeout(resolve, 0));
             const xhr = MockXHR.instances[0]!;
             xhr.status = 500;
             xhr.responseText = JSON.stringify({ error: "Upload failed" });
