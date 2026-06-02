@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useTranslations } from "next-intl";
+import { fuzzyMatchBrand } from "@/lib/api";
 import SearchSuggestions from "@/components/SearchSuggestions";
 /** Maximum number of suggestions shown at once */
 const MAX_SUGGESTIONS = 8;
@@ -84,28 +85,44 @@ export default function SearchBar({ dark = false }: { dark?: boolean }) {
                 setIsOpen(false);
                 return;
             }
-            if (!data || data.length === 0) {
-                setSuggestions([]);
-                setIsOpen(false);
-                return;
-            }
-            // Deduplicate and build a flat list of relevant strings.
+
             const seen = new Set<string>();
             const results: string[] = [];
-            for (const row of data) {
-                const candidates = [
-                    row.brand_name as string | null,
-                    row.batch_number as string | null,
-                ];
-                for (const c of candidates) {
-                    if (c && c.toLowerCase().includes(trimmed.toLowerCase()) && !seen.has(c)) {
-                        seen.add(c);
-                        results.push(c);
-                        if (results.length >= MAX_SUGGESTIONS) break;
+            if (data && data.length > 0) {
+                // Deduplicate and build a flat list of relevant strings.
+                for (const row of data) {
+                    const candidates = [
+                        row.brand_name as string | null,
+                        row.batch_number as string | null,
+                    ];
+                    for (const c of candidates) {
+                        if (c && c.toLowerCase().includes(trimmed.toLowerCase()) && !seen.has(c)) {
+                            seen.add(c);
+                            results.push(c);
+                            if (results.length >= MAX_SUGGESTIONS) break;
+                        }
                     }
+                    if (results.length >= MAX_SUGGESTIONS) break;
                 }
-                if (results.length >= MAX_SUGGESTIONS) break;
             }
+
+            // Typo-tolerance: if we got few or no exact results, query fuzzy matching from the backend!
+            if (results.length < 3) {
+                try {
+                    const fuzzyResults = await fuzzyMatchBrand(trimmed, controller.signal);
+                    for (const match of fuzzyResults) {
+                        if (match.name && !seen.has(match.name) && match.score >= 50) {
+                            seen.add(match.name);
+                            results.push(match.name);
+                            if (results.length >= MAX_SUGGESTIONS) break;
+                        }
+                    }
+                } catch (fuzzyErr) {
+                    // Ignore fuzzy errors and stick with what we have
+                    console.warn("[SearchBar] Fuzzy matching fallback error:", fuzzyErr);
+                }
+            }
+
             setSuggestions(results);
             setActiveIndex(-1);
             setIsOpen(results.length > 0);
@@ -205,7 +222,7 @@ export default function SearchBar({ dark = false }: { dark?: boolean }) {
     return (
         <div ref={containerRef} className="relative w-full">
             <div
-                className={`relative rounded-2xl border transition-all duration-300 ${
+                className={`relative rounded-2xl border transition-[border-color,background-color,box-shadow,transform] duration-300 ease-out ${
                     dark
                         ? isOpen
                             ? "border-emerald-500/60 bg-[#1a2a3a] shadow-[0_0_0_3px_rgba(16,185,129,0.15)]"
@@ -243,7 +260,7 @@ export default function SearchBar({ dark = false }: { dark?: boolean }) {
                         onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
                         onFocus={() => {
-                            if (suggestions.length > 0) setIsOpen(true);
+                            setIsOpen(true);
                         }}
                         placeholder={tHome("search_placeholder")}
                         className={`w-full border-none bg-transparent py-1.5 text-base font-medium outline-none ${
@@ -255,10 +272,10 @@ export default function SearchBar({ dark = false }: { dark?: boolean }) {
                     />
                     <button
                         onClick={() => performSearch(query)}
-                        className="flex shrink-0 items-center gap-2 rounded-xl bg-linear-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-emerald-500/25 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-500/35 active:scale-95"
+                        className="flex shrink-0 items-center gap-2 rounded-xl bg-linear-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-emerald-500/25 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-500/30 active:scale-95"
                         aria-label="Submit search"
                     >
-                        <Search size={16} />
+                        <Search size={16} aria-hidden="true" />
                         {tHome("search_button")}
                     </button>
                 </div>
