@@ -208,7 +208,7 @@ function BottomDrawer({
             <button
                 onClick={expandDrawer}
                 data-testid="mobile-pharmacy-pill"
-                className="pointer-events-auto absolute right-4 bottom-5 z-1000 flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-xl transition-all hover:bg-slate-800 active:scale-95 md:hidden dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+                className="pointer-events-auto absolute right-4 bottom-5 z-10 flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-xl transition-all hover:bg-slate-800 active:scale-95 md:hidden dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
                 aria-label={`Show nearby pharmacies list with ${count} results`}
             >
                 <ChevronUp size={14} />
@@ -220,7 +220,7 @@ function BottomDrawer({
     return (
         <div
             data-testid="mobile-pharmacy-drawer"
-            className="pointer-events-none absolute right-4 bottom-4 left-4 z-1000 sm:left-6 md:hidden"
+            className="pointer-events-none absolute right-4 bottom-4 left-4 z-10 sm:left-6 md:hidden"
         >
             <div className="pointer-events-auto max-h-[68vh] rounded-[30px] border border-(--color-border-muted) bg-(--color-surface-page)/85 p-2 shadow-2xl backdrop-blur-xl">
                 <div className="flex max-h-[calc(68vh-1rem)] flex-col overflow-hidden">
@@ -405,6 +405,57 @@ export default function PharmacyMapPage() {
             setIsShowingCached(false);
         }
     }, [isOffline, isShowingCached]);
+    const getBrowserLocation = useCallback(
+        (
+            onSuccess: (loc: { lat: number; lng: number }) => void,
+            onFailure: (err: GeolocationPositionError) => void
+        ) => {
+            if (!navigator.geolocation) {
+                const error = {
+                    code: 2,
+                    message: "Geolocation not supported",
+                    PERMISSION_DENIED: 1,
+                    POSITION_UNAVAILABLE: 2,
+                    TIMEOUT: 3,
+                } as GeolocationPositionError;
+                onFailure(error);
+                return;
+            }
+
+            const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 };
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    onSuccess({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                },
+                (err) => {
+                    // If high accuracy request timed out or was unavailable, retry with enableHighAccuracy: false
+                    if (
+                        (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) &&
+                        options.enableHighAccuracy
+                    ) {
+                        console.warn(
+                            "High accuracy geolocation failed or timed out. Retrying with low accuracy..."
+                        );
+                        navigator.geolocation.getCurrentPosition(
+                            (pos) => {
+                                onSuccess({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                            },
+                            (retryErr) => {
+                                onFailure(retryErr);
+                            },
+                            { ...options, enableHighAccuracy: false, timeout: 5000 }
+                        );
+                    } else {
+                        onFailure(err);
+                    }
+                },
+                options
+            );
+        },
+        []
+    );
+
     useEffect(() => {
         if (typeof window !== "undefined") {
             const params = new URLSearchParams(window.location.search);
@@ -422,22 +473,29 @@ export default function PharmacyMapPage() {
             }
         }
 
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    setUserLocation(loc);
-                    fetchNearby(loc.lat, loc.lng, radiusKm * 1000);
-                },
-                () => {
-                    fetchNearby(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng, radiusKm * 1000);
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-            );
-        } else {
-            fetchNearby(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng, radiusKm * 1000);
-        }
-    }, [fetchNearby]);
+        getBrowserLocation(
+            (loc) => {
+                setUserLocation(loc);
+                fetchNearby(loc.lat, loc.lng);
+            },
+            (err) => {
+                console.warn("Initial geolocation failed, using default center:", err);
+
+                // Show a clear, transient message so the user knows why they aren't seeing local pharmacies
+                const messages: Record<number, string> = {
+                    1: t("errors.denied"),
+                    2: t("errors.unavailable"),
+                    3: t("errors.timeout"),
+                };
+                const errorMsg = messages[err.code] || t("errors.generic");
+                setLocationError(`${errorMsg} Showing default location (New Delhi).`);
+                setTimeout(() => setLocationError(null), 6000);
+
+                // Fallback to Delhi
+                fetchNearby(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng);
+            }
+        );
+    }, [fetchNearby, getBrowserLocation, t]);
 
     const fetchInBounds = useCallback(
         async (bounds: MapBounds) => {
@@ -525,16 +583,11 @@ export default function PharmacyMapPage() {
 
     // Geolocation
     const handleLocateUser = useCallback(() => {
-        if (!navigator.geolocation) {
-            setLocationError(t("errors.generic"));
-            setTimeout(() => setLocationError(null), 3000);
-            return;
-        }
         setIsLocating(true);
         setLocationError(null);
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+
+        getBrowserLocation(
+            (loc) => {
                 setUserLocation(loc);
                 setIsLocating(false);
                 fetchNearby(loc.lat, loc.lng, radiusKm * 1000);
@@ -548,10 +601,9 @@ export default function PharmacyMapPage() {
                 };
                 setLocationError(messages[err.code] || t("errors.generic"));
                 setTimeout(() => setLocationError(null), 4000);
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+            }
         );
-    }, [fetchNearby, radiusKm]);
+    }, [fetchNearby, radiusKm, getBrowserLocation, t]);
 
     const handleMapReady = useCallback(() => {
         if (!initialFetchDone.current) {
